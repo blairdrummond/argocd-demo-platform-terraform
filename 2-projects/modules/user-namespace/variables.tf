@@ -7,10 +7,6 @@ variable "ingress_enabled" {
   type        = bool
 }
 
-variable "contact_email" {
-  description = "Contact email of the team responsible for this app"
-}
-
 # This can be used, for example, with Kubecost
 # https://guide.kubecost.com/hc/en-us/articles/4407601807383-Kubernetes-Cost-Allocation#kubernetes-cost-allocation
 variable "billing_id" {

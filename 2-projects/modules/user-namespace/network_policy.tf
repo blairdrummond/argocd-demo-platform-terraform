@@ -1,5 +1,6 @@
+# Accept ingress from within this namespace
 resource "kubernetes_network_policy_v1" "allow_same_ns" {
-  count = var.network_policy_allow_same_ns ? 1 : 0
+  count = var.network_security_enabled ? 1 : 0
 
   metadata {
     name      = "allow-same-ns"
@@ -24,13 +25,13 @@ resource "kubernetes_network_policy_v1" "allow_same_ns" {
       }
     }
 
-    policy_types = ["Ingress", "Egress"]
+    policy_types = ["Ingress"]
   }
 }
 
 
 resource "kubernetes_network_policy_v1" "allow_dns" {
-  count = var.network_policy_allow_same_ns ? 1 : 0
+  count = var.network_security_enabled ? 1 : 0
 
   metadata {
     name      = "allow-dns"

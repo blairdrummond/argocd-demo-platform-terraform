@@ -2,8 +2,7 @@ resource "kubernetes_namespace" "ns" {
   metadata {
     name = var.namespace
     labels = {
-      "ingress/enabled" = var.ingress_enabled    
-      "contact"         = var.contact_email
+      "ingress/enabled" = tostring(var.ingress_enabled)
       "billing_id"      = var.billing_id
     }
   }

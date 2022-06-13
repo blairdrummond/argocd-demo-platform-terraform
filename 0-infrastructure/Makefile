@@ -6,17 +6,28 @@ cluster-dev cluster-prod cluster-shared:
 	k3d cluster create $@
 	k3d kubeconfig get $@ > clusters/$@/config.yaml
 
-setup-cluster-secrets:
+apply:
+	terraform init
+	terraform apply
+
+setup-cluster-secrets: 
 	find clusters -name '*.yaml' | while read line; do \
 		export NAME=$$(yq e .clusters[0].name $$line); \
 		export CA_DATA=$$(yq e .clusters[0].cluster.certificate-authority-data $$line); \
-		export SERVER=$$(yq e .clusters[0].cluster.server $$line); \
+		export SERVER="https://$$(kubectl get endpoints --context $$(yq e .clusters[0].name $$line) -o json | jq -r '.. | .ip? // empty'):6443"; \
 		export CERT=$$(yq e .users[0].user.client-certificate-data $$line); \
 		export KEY=$$(yq e .users[0].user.client-key-data $$line); \
 		cat example-cluster-secret.yaml \
 			| envsubst \
 			| yq -P e - \
 			| $(KUBECTL) create -n argocd -f - ; \
+	done
+
+join-docker-networks:
+	find clusters -name '*.yaml' | while read line; do \
+		export NAME=$$(yq e .clusters[0].name $$line); \
+		test $$NAME = k3d-cluster-shared && continue; \
+		docker network connect $$NAME k3d-cluster-shared-server-0; \
 	done
 
 argocd-login:

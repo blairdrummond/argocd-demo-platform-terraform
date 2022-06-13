@@ -1,9 +1,3 @@
-resource "kubernetes_namespace" "name" {
-    metadata {
-      name = var.namespace
-    }
-}
-
 resource "kubernetes_manifest" "appproject" {
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
@@ -53,12 +47,12 @@ resource "kubernetes_manifest" "appproject" {
 }
 
 
-resource "kubernetes_manifest" "applicationset" {
+resource "kubernetes_manifest" "application" {
     for_each = var.clusters
 
     manifest = {
       apiVersion = "argoproj.io/v1alpha1"
-      kind = "ApplicationSet"
+      kind = "Application"
       metadata = {
         name = "project-${each.key}-${var.namespace}"
         namespace = "argocd"
@@ -67,43 +61,22 @@ resource "kubernetes_manifest" "applicationset" {
         }
       }
       spec = {
-        generators = [
-          {
-            git = {
-              repoURL = var.repo
-              revision: each.value.revision
-              directories = [
-                {
-                  path = "*"
-                }
-              ]
-            }
-          }
-        ]
-        template = {
-          metadata = {
-            name = "project-${each.key}-{{path[0]}}"
-            namespace = "argocd"
-          }
-          spec = {
-            project = var.namespace
-            source = {
-              repoURL = var.repo
-              targetRevision = each.value.revision
-              path = "{{path}}"
-            }
-            destination = {
-              server = each.value.cluster_url
-              namespace = var.namespace
-            }
-            syncPolicy = each.value.autosync ? {
-              automated = {
-                prune = "true"
-                selfHeal = "true"
-              }
-            } : {}
-          }
+        project = var.namespace
+        source = {
+          repoURL = var.repo
+          targetRevision = each.value.revision
+          path = "."
         }
+        destination = {
+          name = each.value.cluster server = each.value.cluster_url
+          namespace = var.namespace
+        }
+        syncPolicy = each.value.autosync ? {
+          automated = {
+            prune = "true"
+            selfHeal = "true"
+          }
+        } : {}
       }
     }
 }

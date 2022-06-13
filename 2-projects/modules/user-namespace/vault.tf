@@ -24,7 +24,7 @@ EOT
 resource "kubernetes_service_account_v1" "external_secrets" {
   metadata {
     name      = local.service_account
-    namespace = var.namespace
+    namespace = kubernetes_namespace.ns.id
   }
 }
 
@@ -51,7 +51,7 @@ resource "kubernetes_manifest" "secret_store" {
     kind = "SecretStore"
     metadata = {
       name = "vault-backend"
-      namespace = var.namespace
+      namespace = kubernetes_namespace.ns.id
     }
     spec = {
       provider = {

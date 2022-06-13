@@ -4,6 +4,27 @@ locals {
     repo = "https://github.com/blairdrummond/argocd-demo-platform-manifests"
 }
 
+# Creates some of the namespaces, configures basic stuff
+module "dev_platform" {
+  source = "./modules/platform-project/"
+
+  platform_namespaces = var.platform_namespaces
+
+  providers = {
+    kubernetes = kubernetes.k8s_dev
+  }
+}
+
+module "prod_platform" {
+  source = "./modules/platform-project/"
+
+  platform_namespaces = var.platform_namespaces
+
+  providers = {
+    kubernetes = kubernetes.k8s_prod
+  }
+}
+
 resource "kubernetes_manifest" "appproject" {
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
@@ -32,7 +53,10 @@ resource "kubernetes_manifest" "appproject" {
       # WARNING: This is a very important restriction.
       # This repo can deploy *anything* so you need it locked down.
       sourceRepos = [
-        local.repo
+        local.repo,
+        "https://charts.jetstack.io",
+        "https://open-policy-agent.github.io/gatekeeper/charts",
+        "https://kubernetes.github.io/ingress-nginx"
       ]
       roles = [
         {
@@ -49,97 +73,36 @@ resource "kubernetes_manifest" "appproject" {
   }
 }
 
-# # Namespaces
-# resource "kubernetes_namespace" "dev_platform" {
-#     providers = {
-#       kubernetes = kubernetes.k8s_dev
-#     }
-# }
-# 
-# resource "kubernetes_namespace" "prod_platform" {
-#     providers = {
-#       kubernetes = kubernetes.k8s_prod
-#     }
-# }
+resource "kubernetes_manifest" "platform_application" {
+    manifest = {
+      apiVersion = "argoproj.io/v1alpha1"
+      kind = "Application"
+      metadata = {
+        name = "platform"
+        namespace = "argocd"
+        annotations = {
+          "argocd.argoproj.io/sync-wave" = "2"
+        }
+      }
+      spec = {
+        project = "platform"
+        source = {
+          repoURL = var.platform_manifests_repo
+          targetRevision = var.platform_manifests_repo_revision
+          path = "."
+        }
+        # Deploying back into the shared-services cluster
+        destination = {
+          server    = "https://kubernetes.default.svc"
+          namespace = "argocd"
+        }
 
-# # The ApplicationSet for the platform repo
-# module "platform" {
-# 
-#     for_each = {
-#       "dev" = {
-#           revision    = "main"
-#           cluster_url = local.dev_url
-#           autosync    = true
-#       }
-# 
-#       "prod" = {
-#           revision    = "prod"
-#           cluster_url = local.prod_url
-#           autosync    = false
-#       }
-#     }
-# 
-#     source = "./modules/platform-project/"
-# 
-#     repo         = local.repo
-#     revision     = each.value.revision
-#     cluster_name = each.key
-#     cluster_url  = each.value.cluster_url
-#     autosync     = each.value.autosync
-# 
-# }
-
-
-# resource "kubernetes_manifest" "applicationset" {
-#     manifest = {
-#       apiVersion = "argoproj.io/v1alpha1"
-#       kind = "ApplicationSet"
-#       metadata = {
-#         name = "platform"
-#         namespace = "argocd"
-#         annotations = {
-#           "argocd.argoproj.io/sync-wave" = "2"
-#         }
-#       }
-#       spec = {
-#         generators = [
-#           {
-#             git = {
-#               repoURL = "https://github.com/argoproj/applicationset.git"
-#               revision = "HEAD"
-#               directories = [
-#                 {
-#                   path = "examples/git-generator-directory/cluster-addons/*"
-#                 }
-#               ]
-#             }
-#           }
-#         ]
-#         template = {
-#           metadata = {
-#             name = "platform-{{app}}"
-#             namespace = "argocd"
-#           }
-#           spec = {
-#             project = "platform"
-#             source = {
-#               repoURL = "https://github.com/blairdrummond/terragrunt-experiment-manifests.git"
-#               targetRevision = "HEAD"
-#               path = "applications/platform/{{app}}"
-#             }
-#             destination = {
-#               server = "https://kubernetes.default.svc"
-#               namespace = "{{app}}"
-#             }
-#             syncPolicy = {
-#               automated = {
-#                 prune = "true"
-#                 selfHeal = "true"
-#               }
-#             }
-#           }
-#         }
-#       }
-#     }
-# }
-
+        syncPolicy = {
+          automated = {
+            prune      = true
+            allowEmpty = true
+          }
+        }
+      }
+    }
+}

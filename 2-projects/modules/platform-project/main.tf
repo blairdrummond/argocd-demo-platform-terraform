@@ -4,52 +4,37 @@ resource "kubernetes_namespace" "ns" {
 
   metadata {
     name = each.key
+    labels = {
+        "ingress/enabled" = "true"
+    }
   }
 }
+  
+# Namespace 
+resource "kubernetes_network_policy_v1" "egress_to_enabled_ns" {
+  count = contains(var.platform_namespaces, "ingress-system") ? 1 : 0
 
+  metadata {
+    name = "egress-to-ingress-enabled-ns"
+    namespace = "ingress-system"
+  }
 
-resource "kubernetes_manifest" "applicationset" {
-    manifest = {
-      apiVersion = "argoproj.io/v1alpha1"
-      kind = "ApplicationSet"
-      metadata = {
-        name = "platform"
-        namespace = "argocd"
-        annotations = {
-          "argocd.argoproj.io/sync-wave" = "2"
-        }
-      }
-      spec = {
-        generators = [
-          {
-            git = {
-              repoURL = var.repo
-              revision = var.revision
-              directories = [
-                {
-                  path = var.path
-                }
-              ]
-            }
-          }
-        ]
-        template = {
-          metadata = {
-            name = "platform-${var.cluster_name}-{{path[0]}}"
-            namespace = "argocd"
-          }
-          spec = {
-            project = "platform"
-            source = {
-              repoURL = var.repo
-              targetRevision = var.revision
-              path = "{{path}}"
-            }
-            destination = {
-              server = var.cluster_url
-            }
+  spec {
+    pod_selector {}
+
+    egress {
+      to {
+        namespace_selector {
+          match_labels = {
+            "ingress/enabled" = "true"
           }
         }
       }
     }
+
+    policy_types = ["Egress"]
+  }
+
+  depends_on = [kubernetes_namespace.ns["ingress-system"]]
 }
+
